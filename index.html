@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice Recognition</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+    }
+    button {
+        margin: 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+    }
+    #output {
+        margin-top: 20px;
+    }
+</style>
+</head>
+<body>
+    <button id="startButton">Start Listening</button>
+    <div id="output"></div>
+
+<script>
+    const startButton = document.getElementById('startButton');
+    const endButton = document.getElementById('endButton');
+    const output = document.getElementById('output');
+
+    let recognition;
+    let isListening = false;
+
+    startButton.addEventListener('click', startListening);
+    endButton.addEventListener('click', endListening);
+
+    async function checkcache(query) {
+        try {
+            const response = await fetch('http://127.0.0.1:5000/api/query_cache', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ input_text: query })
+            });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
+            const data = await response.json();
+
+            if (data.output) {
+                const convertedText = data.output;
+                console.log('Converted Text:', convertedText);
+                speak(convertedText);
+            } else {
+                console.log("Answer not found in cache.");
+                convertText(query);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            convertText(query);
+        }
+    }
+
+    async function convertText(query) {
+        try {
+            console.log("Converting...");
+            console.log(query);
+
+            const response = await fetch('http://127.0.0.1:3000/generate-response', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ input_text: query })
+            });
+
+            const data = await response.json();
+
+            const convertedText = data.response;
+            console.log('Converted Text:', convertedText);
+            speak(convertedText);
+        } catch (error) {
+            console.error('Error:', error);
+            startListening();
+        }
+    }
+
+    function startListening() {
+    if (!isListening) {
+        recognition = new webkitSpeechRecognition() || new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        // Adjust recognition settings
+        recognition.lang = 'en-US'; // Specify language if needed
+        recognition.maxAlternatives = 1; // Maximum number of recognition results to return
+        recognition.interimResults = false; // Set to true if you want interim results
+        recognition.continuous = false; // Set to true for continuous recognition
+        recognition.timeout = 500000; // Set a timeout value in milliseconds
+        let text;
+        recognition.onresult = function(event) {
+            const transcript = event.results[event.results.length - 1][0].transcript;
+            output.textContent = transcript;
+            text=transcript;
+            checkcache(transcript); // After receiving the result, check cache
+        };
+
+        recognition.onend = function() {
+            // Once speech recognition ends, set isListening to false
+            isListening = false;
+            console.log("Checkng")
+            console.log(text);
+            if(text==undefined)
+            {
+                speak("cannot hear you");
+            }
+        };
+        
+        recognition.start(); // Start listening
+        isListening = true;
+        startButton.disabled = true;
+        endButton.disabled = false;
+    }
+}
+
+    async function speak(text) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    await new Promise(resolve => {
+        utterance.onend = resolve; // Resolve the promise when speaking is finished
+        window.speechSynthesis.speak(utterance);
+    });
+    console.log("Speaking finished");
+    startListening(); // Start listening after speaking finishes
+}
+
+</script>
+</body>
+</html>
