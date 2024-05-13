@@ -36,7 +36,7 @@
 
     async function checkcache(query) {
         try {
-            const response = await fetch('http://127.0.0.1:5000/api/query_cache', {
+            const response = await fetch('https://cache.umda.io/api/query_cache', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
